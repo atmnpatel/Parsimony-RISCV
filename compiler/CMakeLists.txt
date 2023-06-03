@@ -21,6 +21,8 @@ endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror")
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 add_executable(psv
     src/argument_reader.h

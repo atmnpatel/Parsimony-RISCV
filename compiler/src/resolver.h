@@ -18,6 +18,7 @@
 #include <llvm/IR/Intrinsics.h>
 
 #include <llvm/IR/IntrinsicsX86.h>
+#include <llvm/IR/IntrinsicsRISCV.h>
 
 #include "vfabi.h"
 
@@ -91,6 +92,10 @@ class FunctionResolver {
         Avx512InstrinsicMap = {
             {UMULH, llvm::Intrinsic::x86_avx512_pmulhu_w_512},
             {COLLECTIVE_ADD_ABS_DIFF, llvm::Intrinsic::x86_avx512_psad_bw_512}};
+
+    std::unordered_map<PsimApiEnum, llvm::Intrinsic::ID>
+        RISCVVInstrinsicMap = {
+            {UMULH, llvm::Intrinsic::riscv_vmulhu}};
 
   private:
     ResolverMap resolver_map;

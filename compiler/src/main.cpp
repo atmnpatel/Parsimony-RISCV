@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
     reader.readOption<int>(
         "-S", ps::global_opts.scalable_size,
         "SVE scalable size (0=fixed-size (non scalable), 1=128bit SVE, "
-        "2=256bit SVE, 4=512bit SVE)");
+        "2=256bit SVE, 4=512bit SVE, 8=RISCV experimental)");
     global_opts.error_on_warn =
         reader.hasOption("-Werror", "Treat the warnings as errors");
     global_opts.ignore_warn_set = reader.hasOption(

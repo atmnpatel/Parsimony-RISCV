@@ -17,6 +17,7 @@ import time
 
 script_path = os.path.dirname(os.path.realpath(__file__))
 llvm_path = "${LLVM_INSTALL_DIR}";
+riscv_path = "${RISCV}";
 llvm_backend_path = "${LLVM_BACKEND_DIR}";
 sleef_path = "${SLEEF_INSTALL_DIR}";
 if not llvm_backend_path:
@@ -413,7 +414,13 @@ def run_compiler_steps(infilename, args, unknownargs):
 
         #step 1: front-end -- run clang preprocessor
         preproc1_file = tmp_filename_base + ".pp1.cpp"
-        run(args, llvm_path + "/bin/clang++ -E -fopenmp " + unknownargs + \
+        if args.rvv:
+            run(args, llvm_path + "/bin/clang++ -E -fopenmp=libgomp " + unknownargs + \
+                " -isystem " + script_path + "/../include " + \
+                " " + preproc0_file + \
+                " -o " + preproc1_file + " --sysroot=" + riscv_path + "/sysroot -I " + riscv_path + "/riscv64-unknown-linux-gnu/include/c++/12.2.0/riscv64-unknown-linux-gnu/ -I " + riscv_path + "/riscv64-unknown-linux-gnu/include/c++/12.2.0 --target=riscv64-linux-gnu -march=rv64imafcv -mllvm -riscv-v-vector-bits-max=128 -mllvm -riscv-v-vector-bits-min=128 -mllvm -scalable-vectorization=on")
+        else:
+            run(args, llvm_path + "/bin/clang++ -E -fopenmp=libgomp " + unknownargs + \
                 " -isystem " + script_path + "/../include " + \
                 " " + preproc0_file + \
                 " -o " + preproc1_file)
@@ -426,7 +433,16 @@ def run_compiler_steps(infilename, args, unknownargs):
 
         #step 3: front-end -- compile file in pre-bitcode
         pre_vec_bitcode_file = tmp_filename_base + ".pre_vec.ll"
-        run(args, llvm_path + "/bin/clang++ -fopenmp " + unknownargs + \
+
+        if args.rvv:
+            run(args, llvm_path + "/bin/clang++ -fopenmp " + unknownargs + \
+                " -Xclang -no-opaque-pointers " + \
+                " -fno-vectorize -fno-slp-vectorize -fno-unroll-loops " + \
+                " -isystem " + script_path + "/../include " + \
+                " -S -emit-llvm -g1 -c " +  preproc2_file + \
+                " -o " + pre_vec_bitcode_file + " --target=riscv64-linux-gnu -march=rv64imafcv -mllvm -riscv-v-vector-bits-max=128 -mllvm -riscv-v-vector-bits-min=128 -mllvm -scalable-vectorization=on")
+        else:
+            run(args, llvm_path + "/bin/clang++ -fopenmp " + unknownargs + \
                 " -Xclang -no-opaque-pointers " + \
                 " -fno-vectorize -fno-slp-vectorize -fno-unroll-loops " + \
                 " -isystem " + script_path + "/../include " + \
@@ -448,7 +464,11 @@ def run_compiler_steps(infilename, args, unknownargs):
         else:
             final_outfilename = tmp_filename_base + ".o"
 
-        run(args, llvm_backend_path + "/bin/clang++ -fopenmp " + unknownargs + " -Wno-unused-command-line-argument -c " + \
+        if args.rvv:
+            run(args, llvm_backend_path + "/bin/clang++ -fopenmp " + unknownargs + " -Wno-unused-command-line-argument -c " + \
+                post_vec_bitcode_file + " -o " + final_outfilename + " -L" + riscv_path + "/lib/gcc/riscv64-unknown-linux-gnu/12.2.0/ -static --target=riscv64-linux-gnu -march=rv64imafcv -mllvm -riscv-v-vector-bits-max=128 -mllvm -riscv-v-vector-bits-min=128 -mllvm -scalable-vectorization=on -L" + riscv_path + "/lib")
+        else:
+            run(args, llvm_backend_path + "/bin/clang++ -fopenmp " + unknownargs + " -Wno-unused-command-line-argument -c " + \
                 post_vec_bitcode_file + " -o " + final_outfilename )
         return final_outfilename
 
@@ -467,6 +487,7 @@ def main():
     argparser.add_argument("--Xtmp", dest="tmpdir", type=str, default="tmp", help="Folder for temporary files.")
     argparser.add_argument("--Xv",   dest="verbose", action="store_true", help="Verbose flag for the parsimony script.")
     argparser.add_argument("-h",     dest="help", action="store_true", help="Print help message.")
+    argparser.add_argument("-rvv",   dest="rvv", action="store_true")
 
     args, unknownargs = argparser.parse_known_args()
 
@@ -504,11 +525,15 @@ def main():
 
     # link step
     if not args.compile:
-        if not sleef_path:
-            run(args, llvm_path + "/bin/clang++ -fopenmp " + " ".join(unknownargs) + \
+        if not False:
+            if args.rvv:
+                run(args, llvm_path + "/bin/clang++ -fopenmp=libgomp " + " ".join(unknownargs) + 
+                     " -Wl,-rpath," + llvm_path + "/lib/ " +  " ".join(objs)  + " -o " + args.outputfile + " --target=riscv64-linux-gnu  --sysroot=" + riscv_path + "/sysroot -static -mfloat-abi=soft -march=rv64imafcv -O2 -L" + riscv_path + "/lib -fuse-ld=" + llvm_path + "/bin/ld.lld -L " + riscv_path +  "/lib/gcc/riscv64-unknown-linux-gnu/12.2.0/")
+            else:
+                run(args, llvm_path + "/bin/clang++ -fopenmp " + " ".join(unknownargs) + \
                 " -Wl,-rpath," + llvm_path + "/lib/ " +  " ".join(objs)  + " -o " + args.outputfile)
         else:
-            run(args, llvm_path + "/bin/clang++ -fopenmp " + " ".join(unknownargs) + \
+            run(args, llvm_path + "/bin/clang++ -fopenmp=libgomp " + " ".join(unknownargs) + \
                 " -Wl,-rpath," + sleef_path + "/lib64/ " +  " -Wl,-rpath," + llvm_path + \
                 "/lib/ " +  " ".join(objs) + " -L" + sleef_path + "/lib64 -lsleef" + " -o " + args.outputfile)
 

@@ -10,6 +10,7 @@
 
 #include "transform.h"
 
+#include <llvm/ADT/Triple.h>
 #include <llvm/Analysis/DomTreeUpdater.h>
 #include <llvm/Analysis/VectorUtils.h>
 #include <llvm/IR/Dominators.h>
@@ -436,10 +437,12 @@ Value* TransformStep::transformCall(CallInst* inst) {
     }
 
 #ifdef SLEEF_ENABLE
-    // check if vector math
-    Value* vmath = transformCallVmath(inst);
-    if (vmath) {
-        return vmath;
+    if (!Triple(inst->getModule()->getTargetTriple()).isRISCV()) {
+        // check if vector math
+        Value* vmath = transformCallVmath(inst);
+        if (vmath) {
+            return vmath;
+        }
     }
 #endif
 
@@ -748,8 +751,15 @@ Value* TransformStep::transformCallPsimApi(llvm::CallInst* inst) {
             return ret;
         }
         case FunctionResolver::PsimApiEnum::UMULH: {
-            llvm::Intrinsic::ID id =
-                vf_info.vm_info.function_resolver.Avx512InstrinsicMap[api_enum];
+            llvm::Intrinsic::ID id;
+            if (Triple(f->getParent()->getTargetTriple()).isRISCV()) {
+                id = vf_info.vm_info.function_resolver
+                         .RISCVVInstrinsicMap[api_enum];
+            } else {
+                id = vf_info.vm_info.function_resolver
+                         .Avx512InstrinsicMap[api_enum];
+            }
+
             Function* intrinsic =
                 Intrinsic::getDeclaration(inst->getModule(), id);
 
@@ -785,6 +795,10 @@ Value* TransformStep::transformCallPsimApi(llvm::CallInst* inst) {
             return ret;
         }
         case FunctionResolver::PsimApiEnum::COLLECTIVE_ADD_ABS_DIFF: {
+            if (Triple(f->getParent()->getTargetTriple()).isRISCV()) {
+                FATAL("Can't use collective add abs diff on RISCV" << *inst);
+            }
+
             if (inst->getOperand(1)->getType()->getScalarType() !=
                 builder.getInt8Ty()) {
                 FATAL("Can't transform " << *inst);

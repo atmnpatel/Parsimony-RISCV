@@ -1,0 +1,26 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 23,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "parsimony-rvv",
+      "displayName": "Parsimony RISCV Config",
+      "description": "Default build using Ninja generator",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/../build",
+      "cacheVariables": {
+        "LLVM_ENABLE_PROJECTS": "clang;lld",
+        "CMAKE_BUILD_TYPE": "Release",
+        "LLVM_TARGETS_TO_BUILD": "RISCV",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/../install",
+        "LLVM_DEFAULT_TARGET_TRIPLE": "riscv64-linux-gnu",
+        "BUILD_SHARED_LIBS": "True",
+        "LLVM_USE_SPLIT_DWARF": "True"
+      }
+    }
+  ]
+}
